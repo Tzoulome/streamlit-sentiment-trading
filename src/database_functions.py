@@ -13,7 +13,7 @@ def _connect_db():
         engine: The SQLite database connection object.
     '''
     st.secrets["db_username"]
-    engine = create_engine(f"postgresql+psycopg2://{st.secrets["db_username"]}:{st.secrets["db_password"]}@{st.secrets["db_host"]}:{st.secrets["db_port"]}/{st.secrets["db_db"]}")
+    engine = create_engine(f"postgresql+psycopg2://{st.secrets['db_username']}:{st.secrets['db_password']}@{st.secrets['db_host']}:{st.secrets['db_port']}/{st.secrets['db_db']}")
     
     return engine
 
