@@ -6,7 +6,7 @@ from src.database_functions import read_db
 from src.objects import sql_queries_objects
 
 
-st.write("Review the regex pattern extraction from the posts titles - \b[A-Z-?]{2,5}\b:")
+st.write(r"Review the regex pattern extraction from the posts titles - \b[A-Z-?]{2,5}\b:")
 tickers_review_df = read_db(sql_queries_objects.tickers_review)
 tickers_review_df
 

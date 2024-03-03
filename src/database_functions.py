@@ -1,11 +1,7 @@
-import os
-from dotenv import load_dotenv
 import sqlalchemy
 from sqlalchemy import create_engine
 import pandas as pd
-
-
-load_dotenv(override=True)
+import streamlit as st
 
 
 def _connect_db():
@@ -16,8 +12,8 @@ def _connect_db():
     Returns:
         engine: The SQLite database connection object.
     '''
-    
-    engine = create_engine(f"postgresql+psycopg2://{os.getenv('PGSQL_USERNAME')}:{os.getenv('PGSQL_PASSWORD')}@{os.getenv('PGSQL_HOST')}:{os.getenv('PGSQL_PORT')}/{os.getenv('PGSQL_DB')}")
+    st.secrets["db_username"]
+    engine = create_engine(f"postgresql+psycopg2://{st.secrets["db_username"]}:{st.secrets["db_password"]}@{st.secrets["db_host"]}:{st.secrets["db_port"]}/{st.secrets["db_db"]}")
     
     return engine
 
