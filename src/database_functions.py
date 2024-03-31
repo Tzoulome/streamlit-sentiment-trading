@@ -18,7 +18,7 @@ def _connect_db():
     return engine
 
 
-def read_db(sql:str):
+def read_db(sql:str, params:list=None):
     '''
     Runs a SELECT SQL statement to retrieve data from the PostgreSQL database into a Pandas DataFrame.
     Dependent Functions:
@@ -32,6 +32,9 @@ def read_db(sql:str):
     engine = _connect_db()
     with engine.connect() as session:
 
-        df = pd.read_sql(sql, session)
+        if params:
+            df = pd.read_sql(sql, session, params=params)
+        else:
+            df = pd.read_sql(sql, session)
 
     return df
