@@ -2,66 +2,106 @@ import streamlit as st
 import pandas as pd
 import sys
 from datetime import datetime, timedelta
+import altair as alt
 
 # from src.database_functions import read_db
 from src.objects import sql_queries_objects
-from src.streamlit_elements import generate_top_performers_table, generate_ticker_mentions_line_chart
+from src.streamlit_elements import generate_top_performers_table_data, generate_selected_ticker_charts_data
 
 
 st.set_page_config(page_title='Reddit Sentiment Trading', page_icon=':robot_face:')
 st.title(':robot_face: :red[Reddit] Sentiment Trading')
 
-st.header('Top Performers Mentions', anchor=False, divider='red')
+# Parameters
+min_date = datetime(2024, 3, 1).date()
+today = datetime.today().date()
 
-performers_filters_col_1, performers_filters_col_2, performers_filters_col_3 = st.columns(3)
-performers_filters_col_1.write('Comparison Perdiod:')
-interval = performers_filters_col_2.slider(label='Interval', min_value=1, max_value=30, value=7, label_visibility='collapsed')
-interval_unit = performers_filters_col_3.selectbox(label='Interval Unit', options=['hours', 'days'], index=1, label_visibility='collapsed')
+st.header('Top Performers Mentions', anchor=False, divider='red')
+with st.form(key='performers_filters', border=False):
+    performers_filters_col_1, performers_filters_col_2, performers_filters_col_3 = st.columns(3)
+    previous_period = performers_filters_col_1.date_input(
+        label='Previous comparison Period:',
+        value=[today - pd.Timedelta(14, 'days'), today - pd.Timedelta(7, 'days')],
+        min_value=min_date,
+        max_value=today,
+        format='DD/MM/YYYY'
+    )
+    latest_period = performers_filters_col_2.date_input(
+        label='Latest comparison Period:',
+        value=[today - pd.Timedelta(6, 'days'), today],
+        min_value=min_date,
+        max_value=today,
+        format='DD/MM/YYYY'
+    )
+    performers_filters_col_3.text('')
+    performers_filters_col_3.text('')
+    performers_filters_submit_button = performers_filters_col_3.form_submit_button(label='Apply', use_container_width=True)
 
 # TODO: parametrise query
 # TODO: Show data aggregated or by subreddit
 # TODO: Create Heatmap
-top_performers_df = generate_top_performers_table(
+top_performers_df = generate_top_performers_table_data(
     sql_query=sql_queries_objects.all_recent_tickers,
-    interval=interval,
-    interval_unit=interval_unit
+    latest_period=latest_period,
+    previous_period=previous_period,
 )
 
-interval_cols_name = f'{interval} {interval_unit}'
-st.dataframe(top_performers_df,
+st.dataframe(
+    top_performers_df,
     use_container_width=True,
     column_config={
         'tickers': st.column_config.TextColumn('Ticker'),
-        'previous_count': st.column_config.NumberColumn(f'# previous {interval_cols_name}'),
-        'recent_count': st.column_config.NumberColumn(f'# current {interval_cols_name}'),
-        'ticker_count_diff': st.column_config.NumberColumn('# diff'),
-        'ticker_count_diff_perc': st.column_config.NumberColumn('% diff', format="%.2f %%")
+        'previous_count': st.column_config.NumberColumn(f'# Previous Period'),
+        'recent_count': st.column_config.NumberColumn(f'# Current Period'),
+        'ticker_count_diff': st.column_config.NumberColumn('# Diff'),
+        'ticker_count_diff_perc': st.column_config.NumberColumn('% Diff', format="%.2f %%")
     })
 
 
 st.header('Ticker Analysis', anchor=False, divider='red')
-ticker_filters_col_1, ticker_filters_col_2, ticker_filters_col_3 = st.columns(3)
-ticker_filters_col_1.write('Select a tciker:')
-ticker = ticker_filters_col_2.selectbox('Ticker:', top_performers_df['tickers'], label_visibility='collapsed')
+with st.form(key='analysis_filters', border=False):
+    analysis_filters_col_1, analysis_filters_col_2, analysis_filters_col_3, analysis_filters_col_4 = st.columns(4)
+    ticker = analysis_filters_col_1.selectbox('Ticker:', top_performers_df['tickers'])
+    analysis_period = analysis_filters_col_2.date_input(
+        label='Period:',
+        value= [min_date, today],
+        min_value=min_date,
+        max_value=today,
+        format='DD/MM/YYYY'
+    )
+    analysis_granularity = analysis_filters_col_3.selectbox('Granularity:', ['Days', 'Hours'])
+    analysis_filters_col_4.text('')
+    analysis_filters_col_4.text('')
+    analysis_filters_submit_button = analysis_filters_col_4.form_submit_button(label='Apply', use_container_width=True)
 
-ticker_mentions_df = generate_ticker_mentions_line_chart(
-    sql_query=sql_queries_objects.ticker_selection_all_times,
-    ticker=ticker
+ticker_mentions_count_df, ticker_mentions_df = generate_selected_ticker_charts_data(
+    sql_query=sql_queries_objects.ticker_selection,
+    ticker=ticker,
+    start_date=analysis_period[0],
+    end_date=analysis_period[1],
+    granularity=analysis_granularity
 )
 
-st.line_chart(ticker_mentions_df, x='created_at', y='posts')
+mentions_chart = (
+    alt.Chart(ticker_mentions_count_df)
+    .mark_line(point=True)
+    .encode(x='Date', y='posts')
+)
 
+ticker_price_chart = (
+    alt.Chart(ticker_mentions_count_df)
+    .mark_area(point=True, color='red')
+    .encode(alt.X('Date'), alt.Y('High', scale=alt.Scale(domain=[min(ticker_mentions_count_df['High']), max(ticker_mentions_count_df['High'])])), alt.Y2('Low'), color=alt.value('red'))
+)
 
-# ticker_selection_all_times_feed_df = ticker_mentions_df[['subreddit', 'created_at', 'title', 'content', 'tickers']]
-# ticker_selection_all_times_feed_df
+ticker_chart = (
+    alt.layer(mentions_chart, ticker_price_chart)
+    .resolve_scale(y='independent')
+)
 
+st.altair_chart(ticker_chart, use_container_width=True)
 
+# st.line_chart(ticker_mentions_count_df, x='Date', y='posts')
+# st.line_chart(ticker_mentions_count_df, x='Date', y=['High', 'Low'])
 
-
-# st.write(r"Review the regex pattern extraction from the posts titles - \b[A-Z-?]{2,5}\b:")
-# tickers_review_df = read_db(sql_queries_objects.tickers_review)
-# tickers_review_df
-
-# st.write("Review popular tickers to identify the most common false positives (common accronyms or words):")
-# tickers_count_df = read_db(sql_queries_objects.tickers_count)
-# tickers_count_df
+st.dataframe(ticker_mentions_df)

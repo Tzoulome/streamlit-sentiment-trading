@@ -11,22 +11,28 @@ class sql_queries_objects:
     ON p.id = pt.post_id
 
     WHERE pt.tickers IS NOT NULL
-    AND p.created_at >= CURRENT_DATE - interval %(interval)s%(interval_unit)s
+    AND p.created_at >= %(min_date)s
     
     ORDER BY p.created_at DESC;
     '''
 
-    ticker_selection_all_times = '''
+    ticker_selection = '''
     SELECT
         p.id,
+        p.subreddit,
+        p.username,
         p.created_at,
+        p.title,
+        p.content,
         pt.tickers
-
+    
     FROM reddit.posts p
     LEFT JOIN reddit.posts_tickers pt
     ON p.id = pt.post_id
 
     WHERE %(ticker)s = ANY(pt.tickers)
+    AND p.created_at >= %(start_date)s
+    AND p.created_at < %(end_date)s + interval %(unit)s
     
     ORDER BY p.created_at DESC;
     '''
