@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 import yfinance as yf
 
 from src.database_functions import read_db
@@ -36,45 +37,28 @@ def generate_top_performers_table_data(
 
 
 def generate_selected_ticker_charts_data(
-    sql_query:str,
+    ticker_mentions_df,
+    ticker_hitorical_price_df,
     ticker:str,
-    start_date:datetime.date,
-    end_date:datetime.date,
-    granularity:str
+    time_granularity:str
 ):
     '''
     '''
-
-    ticker = ticker[1::]
-    sql_params = {'ticker': ticker, 'start_date': start_date, 'end_date': end_date, 'unit': f'1 {granularity.lower()[:-1]}'}
-    ticker_mentions_df = read_db(sql_query, params=sql_params)
-
-    ticker_mentions_df = ticker_mentions_df.explode('tickers')
-    ticker_mentions_df = ticker_mentions_df[ticker_mentions_df['tickers'] == ticker]
+    if not ticker_mentions_df.empty:
+        ticker_mentions_df = ticker_mentions_df.explode('tickers')
+        ticker_mentions_df = ticker_mentions_df[ticker_mentions_df['tickers'] == ticker]
+        if time_granularity == 'day':
+            ticker_mentions_df['created_at'] = ticker_mentions_df['created_at'].dt.date
+        elif time_granularity == 'hour':
+            ticker_mentions_df['created_at'] = ticker_mentions_df['created_at'].dt.strftime('%Y-%m-%d %H:00:00')
+    
     ticker_mentions_df = ticker_mentions_df.drop(columns='tickers')
-    if granularity == 'Days':
-        ticker_mentions_df['created_at'] = ticker_mentions_df['created_at'].dt.date
-    elif granularity == 'Hours':
-        ticker_mentions_df['created_at'] = ticker_mentions_df['created_at'].dt.strftime('%Y-%m-%d %H:00:00')
-    ticker_mentions_count_df = ticker_mentions_df.groupby(['created_at'])['id'].nunique().reset_index(name='posts')
+    ticker_mentions_prices_chart_df = ticker_mentions_df.groupby(['created_at'])['id'].nunique().reset_index(name='posts')
 
-    ticker_yf = yf.Ticker(ticker)
-    end_date = end_date + pd.Timedelta(1, granularity.lower())
-    y_finance_df = ticker_yf.history(start=start_date, end=end_date, interval=f'1{granularity.lower()[:1]}')
-    y_finance_df = y_finance_df.reset_index()
-    if granularity == 'Days':
-        y_finance_df['Date'] = y_finance_df['Date'].dt.date
-    elif granularity == 'Hours':
-        y_finance_df = y_finance_df.rename(columns={'Datetime': 'Date'})
-        y_finance_df['Date'] = y_finance_df['Date'].dt.tz_convert(None)
-        # TODO: Consider that this also trims the time by 30 mins.
-        y_finance_df['Date'] = y_finance_df['Date'].dt.strftime('%Y-%m-%d %H:00:00')
-    y_finance_df = y_finance_df[['Date', 'High', 'Low']]
-    ticker_mentions_count_df = ticker_mentions_count_df.merge(y_finance_df, how='outer', left_on='created_at', right_on='Date')
-    ticker_mentions_count_df = ticker_mentions_count_df.drop(columns=['created_at'])
+    ticker_mentions_prices_chart_df = ticker_mentions_prices_chart_df.merge(ticker_hitorical_price_df, how='outer', left_on='created_at', right_on='Date')
+    ticker_mentions_prices_chart_df['Date'] = ticker_mentions_prices_chart_df['Date'].fillna(ticker_mentions_prices_chart_df['created_at'])
+    ticker_mentions_prices_chart_df = ticker_mentions_prices_chart_df.drop(columns=['created_at'])
 
-    ticker_mentions_df = ticker_mentions_df[['created_at', 'subreddit', 'username', 'title', 'content']]
+    ticker_mentions_table_df = ticker_mentions_df[['created_at', 'subreddit', 'username', 'title', 'content']].copy()
 
-
-
-    return ticker_mentions_count_df, ticker_mentions_df
+    return ticker_mentions_prices_chart_df, ticker_mentions_table_df

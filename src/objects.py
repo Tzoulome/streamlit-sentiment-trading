@@ -16,7 +16,7 @@ class sql_queries_objects:
     ORDER BY p.created_at DESC;
     '''
 
-    ticker_selection = '''
+    ticker_selected_mentions = '''
     SELECT
         p.id,
         p.subreddit,
@@ -32,7 +32,7 @@ class sql_queries_objects:
 
     WHERE %(ticker)s = ANY(pt.tickers)
     AND p.created_at >= %(start_date)s
-    AND p.created_at < %(end_date)s + interval %(unit)s
+    AND p.created_at < %(end_date)s
     
     ORDER BY p.created_at DESC;
     '''
